@@ -32,13 +32,14 @@ class GPUDataGenerator:
                 headers={'Content-Type': 'application/json'},
                 timeout=5
             )
+            print(f"Sent data: {data}, Response status: {response.status_code}")
             return response.status_code == 200
         except Exception as e:
             print(f"Error sending data: {e}")
             return False
 
 # Uso
-generator = GPUDataGenerator("http://ingestion-service:8800")
+generator = GPUDataGenerator("http://localhost:5002")
 while True:
     generator.send_data()
     time.sleep(30)  # Enviar cada 30 segundos

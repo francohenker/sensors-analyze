@@ -230,7 +230,7 @@ services:
   python-script:
     build: ./python-script
     environment:
-      - INGESTION_URL=http://data-ingestion:8080
+      - INGESTION_URL=http://data-ingestion:5002
     networks: [rqlite-network]
     depends_on: [data-ingestion]
 
