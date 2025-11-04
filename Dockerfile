@@ -1,6 +1,6 @@
 # Dockerfile
 
-FROM rqlite/rqlite:7.21.4
+FROM rqlite/rqlite:9.21.4
 
 # Expose the necessary ports
 EXPOSE 4001 4002

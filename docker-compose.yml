@@ -43,7 +43,7 @@ services:
       - -node-id=1
       - -http-addr=0.0.0.0:4001
       - -raft-addr=0.0.0.0:4002
-      - -bootstrap-expect=5      
+      - -bootstrap-expect=5
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.rqlite.loadbalancer.server.port=4001"
@@ -69,7 +69,7 @@ services:
       - -raft-addr=0.0.0.0:4002
       - -join=rqlite-node1:4002
       - -join-attempts=60
-      - -join-interval=2s      
+      - -join-interval=2s
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.rqlite.loadbalancer.server.port=4001"
@@ -100,7 +100,7 @@ services:
       - -raft-addr=0.0.0.0:4002
       - -join=rqlite-node1:4002
       - -join-attempts=60
-      - -join-interval=2s      
+      - -join-interval=2s
     labels:
       - "traefik.enable=true"
       - "traefik.http.services.rqlite.loadbalancer.server.port=4001"
@@ -183,6 +183,59 @@ services:
       start_period: 30s
     restart: on-failure
 
+
+
+# Servicio de Ingestion
+  data-ingestion:
+    build: ./ingestion-service
+    container_name: data-ingestion
+    ports:
+      - "5002:5002"
+    environment:
+      - RQLITE_URL=http://traefik
+      - REDIS_URL=redis://redis:6379
+    command: ["node", "/app/server.js"]
+    networks:
+      - rqlite-network
+    depends_on:
+      - rqlite-node1
+      - redis
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - rqlite-network
+
+  alert-service:
+    build: ./alert-service
+    container_name: alert-service
+    ports: ["50051:50051"]
+    environment:
+      - REDIS_URL=redis://redis:6379
+    networks: [rqlite-network]
+    depends_on: [redis]
+    restart: on-failure
+  query-service:
+    build: ./query-service
+    ports: ["8081:8081", "8082:8082"]
+    environment:
+      - RQLITE_URL=http://traefik
+      - REDIS_URL=redis://redis:6379
+    networks: [rqlite-network]
+    depends_on: [rqlite-node1, redis]
+
+  python-script:
+    build: ./python-script
+    environment:
+      - INGESTION_URL=http://data-ingestion:8080
+    networks: [rqlite-network]
+    depends_on: [data-ingestion]
+
+
+
 networks:
   rqlite-network:
     driver: bridge
@@ -193,3 +246,4 @@ volumes:
   rqlite-node3-data:
   rqlite-node4-data:
   rqlite-node5-data:
+

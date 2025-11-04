@@ -1,0 +1,36 @@
+// alert_service.proto
+syntax = "proto3";
+
+service AlertService {
+  rpc CheckTemperature(TemperatureRequest) returns (AlertResponse);
+  rpc ProcessTelemetry(TelemetryRequest) returns (ProcessResponse);
+}
+
+message TemperatureRequest {
+  string gpu_uuid = 1;
+  float gpu_temp = 2;
+  float memory_temp = 3;
+  float hotspot_temp = 4;
+}
+
+message AlertResponse {
+  bool alert_triggered = 1;
+  string alert_type = 2;
+  string severity = 3;
+  string message = 4;
+}
+
+message TelemetryRequest {
+  string gpu_uuid = 1;
+  float gpu_temp = 2;
+  float memory_temp = 3;
+  float hotspot_temp = 4;
+  float power_consumption = 5;
+  float memory_usage = 6;
+}
+
+message ProcessResponse {
+  bool processed = 1;
+  string status = 2;
+  string message = 3;
+}
