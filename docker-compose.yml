@@ -1,80 +1,195 @@
-version: '3.8'
-
 services:
-  sensor-service:
-    build: ./sensor-service
-    container_name: sensor-service
-    ports:
-      - "5001:5001"
+  # TRAEFIK - Reverse Proxy y Load Balancer
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      # API y Dashboard
+      - "--api.insecure=true"
+      - "--api.dashboard=true"
 
-  collector-service:
-    build: ./collector-service
-    container_name: collector-service
+      # Logs
+      - "--log.level=INFO"
+      - "--accesslog=true"
+
+      # Proveedor Docker
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=rqlite-network"
+
+      # EntryPoints
+      - "--entrypoints.web.address=:80"
+
+      # Health check
+      - "--ping=true"
     ports:
-      - "5002:5002"
+      - "80:80"
+      - "8080:8080"  # Dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - rqlite-network
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # NODO 1 - Bootstrap del cluster (primer nodo)
+  rqlite-node1:
+    image: rqlite/rqlite:9.2.1
+    container_name: rqlite-node1
+    command:
+      - -node-id=1
+      - -http-addr=0.0.0.0:4001
+      - -raft-addr=0.0.0.0:4002
+      - -bootstrap-expect=5      
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.rqlite.loadbalancer.server.port=4001"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.path=/status"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.timeout=3s"
+      - "traefik.http.routers.rqlite.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.rqlite.entrypoints=web"
+      - "traefik.http.routers.rqlite.service=rqlite"
+    networks:
+      - rqlite-network
+    volumes:
+      - rqlite-node1-data:/rqlite/data
+    restart: unless-stopped
+
+  # NODO 2
+  rqlite-node2:
+    image: rqlite/rqlite:9.2.1
+    container_name: rqlite-node2
+    command:
+      - -node-id=2
+      - -http-addr=0.0.0.0:4001
+      - -raft-addr=0.0.0.0:4002
+      - -join=rqlite-node1:4002
+      - -join-attempts=60
+      - -join-interval=2s      
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.rqlite.loadbalancer.server.port=4001"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.path=/status"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.timeout=3s"
+    networks:
+      - rqlite-network
+    volumes:
+      - rqlite-node2-data:/rqlite/data
     depends_on:
-      - sensor-service
+      - rqlite-node1
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4001/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: on-failure
 
-  analyzer-service:
-    build: ./analyzer-service
-    container_name: analyzer-service
+  # NODO 3
+  rqlite-node3:
+    image: rqlite/rqlite:9.2.1
+    container_name: rqlite-node3
+    command:
+      - -node-id=3
+      - -http-addr=0.0.0.0:4001
+      - -raft-addr=0.0.0.0:4002
+      - -join=rqlite-node1:4002
+      - -join-attempts=60
+      - -join-interval=2s      
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.rqlite.loadbalancer.server.port=4001"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.path=/status"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.timeout=3s"
+    networks:
+      - rqlite-network
+    volumes:
+      - rqlite-node3-data:/rqlite/data
     depends_on:
-      - collector-service
+      - rqlite-node1
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4001/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: on-failure
 
-  rqlite1:
-    build: .
-    container_name: rqlite1
-    ports:
-      - "4001:4001"
-      - "4002:4002"
+  # NODO 4
+  rqlite-node4:
+    image: rqlite/rqlite:9.2.1
+    container_name: rqlite-node4
+    command:
+      - -node-id=4
+      - -http-addr=0.0.0.0:4001
+      - -raft-addr=0.0.0.0:4002
+      - -join=rqlite-node1:4002
+      - -join-attempts=60
+      - -join-interval=2s
+    labels:
+      - "traefik.enable=true" 
+      - "traefik.http.services.rqlite.loadbalancer.server.port=4001"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.path=/status"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.timeout=3s"
+    networks:
+      - rqlite-network
     volumes:
-      - rqlite1_data:/rqlite/data
-    command: ["rqlited", "-node-id", "node1", "-http-addr", "rqlite1:4001", "-raft-addr", "rqlite1:4002", "./rqDB/data"]
+      - rqlite-node4-data:/rqlite/data
+    depends_on:
+      - rqlite-node1
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4001/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: on-failure
 
-  rqlite2:
-    build: .
-    container_name: rqlite2
-    ports:
-      - "4003:4003"
-      - "4004:4004"
+  # NODO 5
+  rqlite-node5:
+    image: rqlite/rqlite:9.2.1
+    container_name: rqlite-node5
+    command:
+      - -node-id=5
+      - -http-addr=0.0.0.0:4001
+      - -raft-addr=0.0.0.0:4002
+      - -join=rqlite-node1:4002
+      - -join-attempts=60
+      - -join-interval=2s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.rqlite.loadbalancer.server.port=4001"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.path=/status"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.interval=5s"
+      - "traefik.http.services.rqlite.loadbalancer.healthcheck.timeout=3s"
+    networks:
+      - rqlite-network
     volumes:
-      - rqlite2_data:/rqlite/data
-    command: ["rqlited", "-node-id", "node2", "-http-addr", "rqlite2:4003", "-raft-addr", "rqlite2:4004", "-join", "rqlite1:4002", "./rqDB/data"] 
+      - rqlite-node5-data:/rqlite/data
+    depends_on:
+      - rqlite-node1
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:4001/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: on-failure
 
-  rqlite3:
-    build: .
-    container_name: rqlite3
-    ports:
-      - "4005:4005"
-      - "4006:4006"
-    volumes:
-      - rqlite3_data:/rqlite/data
-    command: ["rqlited", "-node-id", "node3", "-http-addr", "rqlite3:4005", "-raft-addr", "rqlite3:4006", "-join", "rqlite1:4002", "./rqDB/data"]
-
-  rqlite4:
-    build: .
-    container_name: rqlite4
-    ports:
-      - "4007:4007"
-      - "4008:4008"
-    volumes:
-      - rqlite4_data:/rqlite/data
-    command: ["rqlited", "-node-id", "node4", "-http-addr", "rqlite4:4007", "-raft-addr", "rqlite4:4008", "-join", "rqlite1:4002", "./rqDB/data"]
-
-  rqlite5:
-    build: .
-    container_name: rqlite5
-    ports:
-      - "4009:4009"
-      - "4010:4010"
-    volumes:
-      - rqlite5_data:/rqlite/data
-    command: ["rqlited", "-node-id", "node5", "-http-addr", "rqlite5:4009", "-raft-addr", "rqlite5:4010", "-join", "rqlite1:4002", "./rqDB/data"]
+networks:
+  rqlite-network:
+    driver: bridge
 
 volumes:
-  rqlite1_data:
-  rqlite2_data:
-  rqlite3_data:
-  rqlite4_data:
-  rqlite5_data:
-
+  rqlite-node1-data:
+  rqlite-node2-data:
+  rqlite-node3-data:
+  rqlite-node4-data:
+  rqlite-node5-data:
