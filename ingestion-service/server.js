@@ -1,11 +1,13 @@
 // ingestion-service/server.js
+const { DataApiClient } = require('rqlite-js');
 const express = require('express');
-const axios = require('axios');
 const Redis = require('ioredis');
 
 const app = express();
 const redis = new Redis(process.env.REDIS_URL);
-const RQLITE_URL = process.env.RQLITE_URL || 'http://rqlite-node1:4001';
+
+// Inicializar cliente de rqlite
+const rqliteClient = new DataApiClient('http://localhost:4001');
 
 app.use(express.json());
 
@@ -17,74 +19,71 @@ app.post('/api/v1/telemetry', async (req, res) => {
 
         // 1. Almacenar en rqlite (event store)
         console.log('📦 Storing in rqlite...'); // ✅ Log de almacenamiento
-        await storeInRqlite(telemetryData);
+        await storeEventInRqlite(telemetryData);
         console.log('✅ Stored in rqlite successfully');
 
         // 2. Publicar evento para procesamiento en tiempo real
-        console.log('📢 Publishing to Redis...');
-        await redis.publish('gpu_telemetry', JSON.stringify(telemetryData));
-        console.log('✅ Published to Redis successfully');
+        // console.log('📢 Publishing to Redis...');
+        // await redis.publish('gpu_telemetry', JSON.stringify(telemetryData));
+        // console.log('✅ Published to Redis successfully');
 
         // 3. Verificar reglas de alerta
-        await checkAlertRules(telemetryData);
+        // await checkAlertRules(telemetryData);
 
         res.status(200).json({ status: 'processed' });
     } catch (error) {
-        console.log('Error processing telemetry data:', error);
+        console.log('Error processing telemetry data:', error.message);
         res.status(500).json({ error: error.message });
     }
 });
 
-async function storeInRqlite(data) {
-    const query = `
-        INSERT INTO event_store (
-            event_id, event_type, aggregate_type, aggregate_id, 
-            payload, metadata, timestamp
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    `;
+async function storeEventInRqlite(data) {
+    const query = `INSERT INTO event_store (event_id, event_type, aggregate_type, aggregate_id) VALUES (?, ?, ?, ?)`;
 
-    const event = {
-        event_id: generateId(),
-        event_type: 'gpu_telemetry_received',
-        aggregate_type: 'gpu',
-        aggregate_id: data.gpu_uuid,
-        payload: JSON.stringify(data),
-        metadata: JSON.stringify({ source: 'python_script', version: '1.0' }),
-        timestamp: new Date().toISOString()
-    };
+    const params = [
+        generateIdText(),                    // event_id
+        'gpu_telemetry_received',        // event_type
+        'gpu',                           // aggregate_type
+        data.aggregate_id,                   // aggregate_id
+        // JSON.stringify(data),            // payload
+        // JSON.stringify({ source: 'python_script', version: '1.0' }), // metadata
+    ];
 
     try {
-        console.log('🎯 Sending to rqlite via load balancer:', `${RQLITE_URL}/db/execute`);
-        const response = await axios.post(`${RQLITE_URL}/db/execute`, {
-            queries: [
-                {
-                    sql: query,
-                    params: Object.values(event)
-                }
-            ]
-        });
-        console.log('✅ Rqlite response:', response.data);
-        return response.data;
+        console.log('🎯 Sending to rqlite using DataApiClient');
+        console.log('📝 Query:', query);
+        console.log('📝 Params:', params);
+
+        const statement = [query, params];
+        const result = await rqliteClient.execute(statement);
+
+        console.log('✅ Rqlite response:', result);
+        return result;
     } catch (error) {
-        console.error('❌ Rqlite error:', error.response?.data || error.message);
+        console.error('❌ Rqlite error:', error.message);
+        console.error('❌ Error details:', error);
         throw error;
     }
 }
 
 async function checkAlertRules(telemetryData) {
     // Usar gpu_temp_celsius en lugar de temperature
-    if (telemetryData.gpu_temp_celsius > 80) {
-        await redis.publish('gpu_alerts', JSON.stringify({
-            type: 'HIGH_TEMPERATURE',
-            gpu_uuid: telemetryData.gpu_uuid,
-            temperature: telemetryData.gpu_temp_celsius,
-            timestamp: new Date().toISOString()
-        }));
-    }
+    // if (telemetryData.gpu_temp_celsius > 80) {
+    //     await redis.publish('gpu_alerts', JSON.stringify({
+    //         type: 'HIGH_TEMPERATURE',
+    //         gpu_uuid: telemetryData.gpu_uuid,
+    //         temperature: telemetryData.gpu_temp_celsius,
+    //         timestamp: new Date().toISOString()
+    //     }));
+    // }
 }
 
 function generateId() {
     return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+}
+
+function generateIdText() {
+    return Date.now().toString() + Math.random().toString(36);
 }
 
 

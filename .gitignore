@@ -1,2 +1,4 @@
 ingestion-service/node_modules
+ingestion-service/.env
 query-service/node_modules
+query-service/.env
