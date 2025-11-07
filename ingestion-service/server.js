@@ -2,14 +2,19 @@
 const { DataApiClient } = require('rqlite-js');
 const express = require('express');
 const Redis = require('ioredis');
+// const Redis = require('redis');
 
 const app = express();
-const redis = new Redis('http://localhost:6379');
+const redis = new Redis({
+    host: '127.0.0.1',
+    port: 6379
+});
 
 // Inicializar cliente de rqlite
 const rqliteClient = new DataApiClient('http://localhost:4001');
 
 app.use(express.json());
+
 // Manejo de errores de Redis
 redis.on('error', (err) => console.error('❌ Redis error:', err.message));
 redis.on('connect', () => console.log('✅ Connected to Redis'));
