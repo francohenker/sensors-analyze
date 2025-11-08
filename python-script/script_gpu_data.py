@@ -14,12 +14,12 @@ class GPUDataGenerator:
         """Genera datos completos de GPU incluyendo info del hardware"""
         return {
             # Identificación de GPU
-            "gpu_uuid": f"gpu-{random.randint(1000, 9999)}",
+            "gpu_uuid": f"gpu-{random.randint(10, 99)}",
             "rig_name": f"rig-{random.choice(['A', 'B', 'C'])}",
             "gpu_index": random.randint(0, 7),
             
             # Información del hardware (para tabla gpus)
-            "model": random.choice(['RTX 3080', 'RTX 3090', 'RX 6800 XT', 'RTX 4090']),
+            "model": random.choice(['RTX 3080', 'RTX 3090', 'RX 6800 XT', 'RTX 4090', 'RTX 5080', 'RTX 5090', 'RX 9070XT', 'RTX 5080Ti', 'RX 7900XTX']),
             "vendor": random.choice(['NVIDIA', 'AMD']),
             "memory_size_mb": random.choice([8192, 10240, 16384, 24576]),
             
@@ -73,7 +73,7 @@ class GPUDataGenerator:
 
 
 # Uso
-generator = GPUDataGenerator("http://localhost:5002")
+generator = GPUDataGenerator("http://data-ingestion:5002")
 print("🚀 Starting GPU Data Generator...")
 print("📊 Sending telemetry data every 30 seconds")
 print("Press Ctrl+C to stop\n")

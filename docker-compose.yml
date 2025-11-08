@@ -193,7 +193,7 @@ services:
       - "5002:5002"
     environment:
       - RQLITE_URL=http://traefik
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis
     command: ["node", "/app/server.js"]
     networks:
       - rqlite-network
@@ -214,7 +214,7 @@ services:
     container_name: alert-service
     ports: ["50051:50051"]
     environment:
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis
     networks: [rqlite-network]
     depends_on: [redis]
     restart: on-failure
@@ -223,7 +223,7 @@ services:
     ports: ["8081:8081", "8082:8082"]
     environment:
       - RQLITE_URL=http://traefik
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis
     networks: [rqlite-network]
     depends_on: [rqlite-node1, redis]
 

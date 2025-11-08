@@ -2,16 +2,15 @@
 const { DataApiClient } = require('rqlite-js');
 const express = require('express');
 const Redis = require('ioredis');
-// const Redis = require('redis');
 
 const app = express();
 const redis = new Redis({
-    host: '127.0.0.1',
+    host: process.env.REDIS_URL || 'redis://redis',
     port: 6379
 });
 
 // Inicializar cliente de rqlite
-const rqliteClient = new DataApiClient('http://localhost:4001');
+const rqliteClient = new DataApiClient(process.env.RQLITE_URL || 'http://traefik');
 
 app.use(express.json());
 
