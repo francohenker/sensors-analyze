@@ -4,9 +4,20 @@ const express = require('express');
 const axios = require('axios');
 const Redis = require('ioredis');
 const { DataApiClient } = require('rqlite-js');
+const cors = require('cors');
 
 
 const app = express();
+
+// Configurar CORS para permitir peticiones desde el frontend
+app.use(cors({
+    origin: process.env.CORS_ORIGIN || '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true
+}));
+
+app.use(express.json());
+
 const redis = new Redis({
     host: process.env.REDIS_URL || 'redis://redis',
     port: 6379

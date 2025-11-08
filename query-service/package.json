@@ -9,6 +9,7 @@
   "dependencies": {
     "@babel/runtime": "^7.28.4",
     "axios": "^1.6.0",
+    "cors": "^2.8.5",
     "express": "^4.18.2",
     "ioredis": "^5.0.0",
     "rqlite-js": "^2.5.7",

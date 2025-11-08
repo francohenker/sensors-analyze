@@ -14,7 +14,7 @@ class GPUDataGenerator:
         """Genera datos completos de GPU incluyendo info del hardware"""
         return {
             # Identificación de GPU
-            "gpu_uuid": f"gpu-{random.randint(10, 99)}",
+            "gpu_uuid": f"gpu-{random.randint(10, 20)}",
             "rig_name": f"rig-{random.choice(['A', 'B', 'C'])}",
             "gpu_index": random.randint(0, 7),
             

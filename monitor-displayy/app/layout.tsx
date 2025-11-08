@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { GPUProvider } from "@/contexts/gpu-context";
+import { WebSocketProvider } from "@/contexts/websocket-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Monitor Display",
-  description: "A dashboard to monitor GPU mining performance",
+  title: "Mining Monitor - Dashboard",
+  description: "Sistema de monitoreo en tiempo real para rigs de minería GPU",
 };
 
 export default function RootLayout({
@@ -23,11 +25,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <WebSocketProvider>
+          <GPUProvider>
+            {children}
+          </GPUProvider>
+        </WebSocketProvider>
       </body>
     </html>
   );
