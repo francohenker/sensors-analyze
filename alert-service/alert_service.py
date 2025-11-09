@@ -6,6 +6,7 @@ import redis
 import json
 import logging
 import threading
+from datetime import datetime
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -78,6 +79,7 @@ class AlertServicer(alert_service_pb2_grpc.AlertServiceServicer):
                 "severity": severity,
                 "temperature": request.gpu_temp,
                 "threshold": 85,
+                "triggered_at": datetime.utcnow().isoformat() + 'Z',
                 "source": "grpc_check"
             }
             try:
@@ -126,7 +128,9 @@ class AlertServicer(alert_service_pb2_grpc.AlertServiceServicer):
         if alerts_triggered:
             alert_event = {
                 "gpu_uuid": request.gpu_uuid,
+                "rig_name": getattr(request, 'rig_name', None),
                 "alerts": alerts_triggered,
+                "triggered_at": datetime.utcnow().isoformat() + 'Z',
                 "source": "grpc_telemetry"
             }
             self.redis_client.publish('gpu_alerts', json.dumps(alert_event))

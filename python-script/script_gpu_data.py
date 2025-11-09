@@ -10,20 +10,79 @@ class GPUDataGenerator:
         self.ingestion_url = f"{ingestion_service_url}/api/v1/telemetry"
         self.mining_session = f"{ingestion_service_url}/api/v1/mining-session"
 
-    def generate_gpu_data(self):
-        """Genera datos completos de GPU incluyendo info del hardware"""
+        # Configuración fija de las 20 GPUs (4 rigs x 5 GPUs)
+        self.gpu_fleet = self._initialize_gpu_fleet()
+
+    def _initialize_gpu_fleet(self):
+        """Inicializa la flota de 20 GPUs con configuraciones fijas"""
+        fleet = []
+
+        # Rig A - 5x RTX 3080 Ti
+        for i in range(5):
+            fleet.append(
+                {
+                    "gpu_uuid": f"gpu-A-{i+1}",
+                    "rig_name": "rig-A",
+                    "gpu_index": i,
+                    "model": "RTX 3080 Ti",
+                    "vendor": "NVIDIA",
+                    "memory_size_mb": 10240,
+                }
+            )
+
+        # Rig B - 5x RTX 3090
+        for i in range(5):
+            fleet.append(
+                {
+                    "gpu_uuid": f"gpu-B-{i+1}",
+                    "rig_name": "rig-B",
+                    "gpu_index": i,
+                    "model": "RTX 3090",
+                    "vendor": "NVIDIA",
+                    "memory_size_mb": 24576,
+                }
+            )
+
+        # Rig C - 5x RTX 5080 Ti
+        for i in range(5):
+            fleet.append(
+                {
+                    "gpu_uuid": f"gpu-C-{i+1}",
+                    "rig_name": "rig-C",
+                    "gpu_index": i,
+                    "model": "RTX 5080 Ti",
+                    "vendor": "AMD",
+                    "memory_size_mb": 16384,
+                }
+            )
+
+        # Rig D - 5x RTX 4090
+        for i in range(5):
+            fleet.append(
+                {
+                    "gpu_uuid": f"gpu-D-{i+1}",
+                    "rig_name": "rig-D",
+                    "gpu_index": i,
+                    "model": "RTX 4090",
+                    "vendor": "NVIDIA",
+                    "memory_size_mb": 24576,
+                }
+            )
+
+        return fleet
+
+    def generate_gpu_data(self, gpu_config):
+        """Genera datos de telemetría para una GPU específica manteniendo su configuración fija"""
         return {
-            # Identificación de GPU
-            "gpu_uuid": f"gpu-{random.randint(10, 20)}",
-            "rig_name": f"rig-{random.choice(['A', 'B', 'C'])}",
-            "gpu_index": random.randint(0, 7),
-            
-            # Información del hardware (para tabla gpus)
-            "model": random.choice(['RTX 3080', 'RTX 3090', 'RX 6800 XT', 'RTX 4090', 'RTX 5080', 'RTX 5090', 'RX 9070XT', 'RTX 5080Ti', 'RX 7900XTX']),
-            "vendor": random.choice(['NVIDIA', 'AMD']),
-            "memory_size_mb": random.choice([8192, 10240, 16384, 24576]),
-            
-            # Métricas de temperatura (para tabla temperature_readings)
+            # Identificación de GPU (FIJO)
+            "gpu_uuid": gpu_config["gpu_uuid"],
+            "rig_name": gpu_config["rig_name"],
+            "gpu_index": gpu_config["gpu_index"],
+            # Información del hardware (FIJO)
+            "model": gpu_config["model"],
+            "vendor": gpu_config["vendor"],
+            "memory_size_mb": gpu_config["memory_size_mb"],
+            # Métricas variables (cambian en cada envío)
             "gpu_temp_celsius": random.uniform(40, 95),
             "memory_temp_celsius": random.uniform(50, 105),
             "hotspot_temp_celsius": random.uniform(45, 110),
@@ -32,52 +91,54 @@ class GPUDataGenerator:
             "fan_speed_percentage": random.uniform(30, 100),
             "fan_speed_rpm": random.randint(1500, 3500),
             "ambient_temp_celsius": random.uniform(20, 30),
-            
             "timestamp": time.time(),
         }
 
-    def generate_event_store(self):
-        return {
-            "event_id": f"event-{random.randint(10000, 99999)}",
-            "event_type": "gpu_telemetry",
-            "event_version": 1, 
-            "aggregate_type": "gpu",
-            "aggregate_id": f"gpu-{random.randint(1000, 9999)}",
-            "timestamp": time.time(),
-            "metadata": {"source": "gpu_data_generator", "version": "1.0"},
-            # "payload": self.generate_gpu_data()
-            "payload": {"opai": "a"},
-            "processed": False,
-            "correlation_id": "correlation_id",
-            "causation_id": "causation_id",
-        }
+    def send_data_for_all_gpus(self):
+        """Envía datos de telemetría para todas las 20 GPUs"""
+        success_count = 0
 
-    def send_data(self):
-        # Enviar datos de GPU con toda la información
-        data = self.generate_gpu_data()
-        try:
-            response = requests.post(
-                self.ingestion_url,
-                json=data,
-                headers={"Content-Type": "application/json"},
-                timeout=5,
-            )
-            print(f"✅ Sent GPU data: gpu_uuid={data['gpu_uuid']}, temp={data['gpu_temp_celsius']:.2f}°C")
-            print(f"   Response status: {response.status_code}")
-            if response.status_code != 200:
-                print(f"   Error response: {response.text}")
-            return response.status_code == 200
-        except Exception as e:
-            print(f"❌ Error sending data: {e}")
-            return False
+        for gpu_config in self.gpu_fleet:
+            data = self.generate_gpu_data(gpu_config)
+            try:
+                response = requests.post(
+                    self.ingestion_url,
+                    json=data,
+                    headers={"Content-Type": "application/json"},
+                    timeout=5,
+                )
+
+                if response.status_code == 200:
+                    success_count += 1
+                    print(
+                        f"✅ {gpu_config['gpu_uuid']} ({gpu_config['model']}) | "
+                        f"Temp: {data['gpu_temp_celsius']:.1f}°C | "
+                        f"Load: {data['load_percentage']:.0f}% | "
+                        f"Power: {data['power_draw_watt']:.0f}W"
+                    )
+                else:
+                    print(
+                        f"❌ Error sending {gpu_config['gpu_uuid']}: {response.status_code}"
+                    )
+
+            except Exception as e:
+                print(f"❌ Error sending {gpu_config['gpu_uuid']}: {e}")
+
+        print(f"\n📊 Sent telemetry for {success_count}/{len(self.gpu_fleet)} GPUs\n")
+        return success_count == len(self.gpu_fleet)
 
 
 # Uso
 generator = GPUDataGenerator("http://data-ingestion:5002")
 print("🚀 Starting GPU Data Generator...")
-print("📊 Sending telemetry data every 30 seconds")
+print(f"📊 Managing fleet of {len(generator.gpu_fleet)} GPUs:")
+print(f"   - Rig A: 5x RTX 3080 (10GB)")
+print(f"   - Rig B: 5x RTX 3090 (24GB)")
+print(f"   - Rig C: 5x RX 6800 XT (16GB)")
+print(f"   - Rig D: 5x RTX 4090 (24GB)")
+print("\n📡 Sending telemetry data every 30 seconds")
 print("Press Ctrl+C to stop\n")
 
 while True:
-    generator.send_data()
+    generator.send_data_for_all_gpus()
     time.sleep(30)  # Enviar cada 30 segundos

@@ -15,14 +15,23 @@ interface TelemetryData {
     timestamp: string
 }
 
-interface AlertData {
-    id: number
-    gpu_id: number
+export interface AlertData {
+    id?: number
+    gpu_id?: number
     gpu_uuid: string
-    rig_name: string
+    rig_name?: string
     severity: 'CRITICAL' | 'WARNING' | 'INFO'
     message: string
-    triggered_at: string
+    triggered_at?: string
+    alert_type?: string
+    alerts?: Array<{
+        type: string
+        value: number
+        threshold: number
+    }>
+    // Campos para estructura plana (legacy)
+    threshold_value?: number
+    triggered_value?: number
 }
 
 interface WebSocketMessage {
@@ -43,6 +52,32 @@ interface WebSocketContextType {
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined)
 
+// Función para mapear alert_type a severidad
+const mapAlertTypeToSeverity = (alertType: string): 'CRITICAL' | 'WARNING' | 'INFO' => {
+    const criticalTypes = [
+        'HIGH_GPU_TEMP',
+        'HIGH_MEMORY_TEMP', 
+        'HIGH_HOTSPOT_TEMPERATURE',
+        'HIGH_MEMORY_TEMPERATURE',
+        'HIGH_TEMPERATURE'
+    ]
+    
+    const warningTypes = [
+        'HIGH_POWER_CONSUMPTION',
+        'HIGH_POWER',
+        'FAN_MAX_SPEED',
+        'SUSTAINED_HIGH_LOAD'
+    ]
+    
+    if (criticalTypes.includes(alertType)) {
+        return 'CRITICAL'
+    } else if (warningTypes.includes(alertType)) {
+        return 'WARNING'
+    } else {
+        return 'INFO'
+    }
+}
+
 export function WebSocketProvider({ children }: { children: ReactNode }) {
     const [ws, setWs] = useState<WebSocket | null>(null)
     const [isConnected, setIsConnected] = useState(false)
@@ -52,7 +87,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     const connect = useCallback(() => {
         try {
-            // Ajusta la URL según tu configuración
             const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8081'
             const websocket = new WebSocket(wsUrl)
 
@@ -65,7 +99,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             websocket.onmessage = (event) => {
                 try {
                     const message: WebSocketMessage = JSON.parse(event.data)
-
                     console.log('📨 WebSocket message received:', message.type)
 
                     switch (message.type) {
@@ -81,13 +114,37 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
                         case 'alert_notification':
                             if (message.data) {
-                                const alert = message.data as AlertData
-                                setAlerts(prev => [alert, ...prev].slice(0, 50)) // Keep last 50 alerts
+                                const rawAlert = message.data as any
+                                console.log('📥 Raw alert received:', rawAlert)
+
+                                // Procesar alerta con severidad corregida
+                                const processedAlert: AlertData = {
+                                    id: rawAlert.id || Date.now(),
+                                    gpu_uuid: rawAlert.gpu_uuid || 'unknown',
+                                    rig_name: rawAlert.rig_name || 'Unknown',
+                                    message: rawAlert.message || 'Alert triggered',
+                                    triggered_at: rawAlert.triggered_at || message.timestamp,
+                                    alert_type: rawAlert.alert_type,
+                                    triggered_value: rawAlert.triggered_value,
+                                    threshold_value: rawAlert.threshold_value,
+                                    severity: rawAlert.alert_type 
+                                        ? mapAlertTypeToSeverity(rawAlert.alert_type)
+                                        : (rawAlert.severity || 'INFO'),
+                                    alerts: rawAlert.alerts || []
+                                }
+
+                                console.log('🔄 Processed alert with corrected severity:', processedAlert)
+                                
+                                setAlerts(prev => {
+                                    const newAlerts = [processedAlert, ...prev].slice(0, 50)
+                                    return newAlerts
+                                })
                             }
                             break
                     }
                 } catch (err) {
                     console.error('❌ Error parsing WebSocket message:', err)
+                    setError('Error parsing message')
                 }
             }
 
@@ -100,7 +157,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
                 console.log('🔌 WebSocket disconnected')
                 setIsConnected(false)
 
-                // Reconnect after 5 seconds
                 setTimeout(() => {
                     console.log('🔄 Attempting to reconnect...')
                     connect()
@@ -108,7 +164,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             }
 
             setWs(websocket)
-
             return websocket
         } catch (err) {
             console.error('❌ Failed to create WebSocket:', err)
@@ -119,7 +174,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         const websocket = connect()
-
         return () => {
             if (websocket) {
                 websocket.close()
