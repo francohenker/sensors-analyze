@@ -55,12 +55,6 @@ class AlertServicer(alert_service_pb2_grpc.AlertServiceServicer):
                 f"{alert['triggered_value']} (threshold: {alert['threshold_value']})"
             )
         
-        # Aquí puedes agregar lógica adicional:
-        # - Enviar emails
-        # - Enviar notificaciones push
-        # - Guardar en base de datos de alertas
-        # - Escalar alertas críticas
-    
     def CheckTemperature(self, request, context):
         """gRPC endpoint para verificar temperatura (llamado por query-service)"""
         alert_triggered = False
