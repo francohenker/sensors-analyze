@@ -8,6 +8,7 @@
 
 El sistema está compuesto por los siguientes microservicios especializados:
 ![Diagrama](./diagram-microservices.jpeg)
+
 (Notese que la comunicación con los microservicios que no tienen flechas son bidireccionales)
 
 ### 🐍 **Python Script** simulando los iot devices (Python)
