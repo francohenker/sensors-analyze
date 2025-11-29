@@ -18,8 +18,8 @@ export function GPUCard({ gpu }: { gpu: GPUData }) {
             <CardHeader className="pb-3 bg-card/50 border-b border-border/30">
                 <div className="flex items-start justify-between gap-2">
                     <div className="flex-1">
-                        <CardTitle className="text-base text-foreground">{gpu.model}</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-1">
+                        <CardTitle className="text-xl text-foreground">{gpu.model}</CardTitle>
+                        <p className="text-x text-muted-foreground mt-1">
                             {gpu.rig_name} • {gpu.gpu_uuid}
                         </p>
                     </div>
@@ -57,7 +57,7 @@ export function GPUCard({ gpu }: { gpu: GPUData }) {
                 <GPUMetrics metrics={gpu.current_metrics} />
 
                 {/* GPU Info */}
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/20">
+                {/* <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border/20">
                     <div>
                         <p className="text-xs text-muted-foreground">Uptime</p>
                         <p className="text-sm font-medium text-foreground">{gpu.uptime_hours}h</p>
@@ -66,7 +66,7 @@ export function GPUCard({ gpu }: { gpu: GPUData }) {
                         <p className="text-xs text-muted-foreground">Edad</p>
                         <p className="text-sm font-medium text-foreground">{gpu.age_days}d</p>
                     </div>
-                </div>
+                </div> */}
 
                 {/* Recommendations */}
                 {gpu.recommendations && gpu.recommendations.length > 0 && <Recommendations recs={gpu.recommendations} />}

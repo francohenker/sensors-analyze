@@ -104,7 +104,8 @@ export function GPUProvider({ children }: { children: React.ReactNode }) {
                 })
                 
                 if (!response.ok) {
-                    throw new Error(`Failed to fetch GPU data: ${response.status} ${response.statusText}`)
+                    // throw new Error(`Failed to fetch GPU data: ${response.status} ${response.statusText}`)
+                    console.log("error fetching initial GPU data, status:", response.status)
                 }
 
                 const data = await response.json()
@@ -235,7 +236,7 @@ export function GPUProvider({ children }: { children: React.ReactNode }) {
                                 action: rec.action || '',
                                 reason: rec.reason || '',
                                 priority: rec.severity === 'critical' || rec.severity === 'high' ? 'high' : 
-                                         rec.severity === 'medium' ? 'medium' : 'low',
+                                        rec.severity === 'medium' ? 'medium' : 'low',
                                 expected_impact: rec.expected_impact
                             }))
 

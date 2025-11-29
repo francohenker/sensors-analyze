@@ -24,14 +24,13 @@ export interface AlertData {
     message: string
     triggered_at?: string
     alert_type?: string
+    triggered_value?: number
+    threshold_value?: number
     alerts?: Array<{
         type: string
         value: number
         threshold: number
     }>
-    // Campos para estructura plana (legacy)
-    threshold_value?: number
-    triggered_value?: number
 }
 
 interface WebSocketMessage {
@@ -114,23 +113,23 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
                         case 'alert_notification':
                             if (message.data) {
-                                const rawAlert = message.data as any
+                                const rawAlert = message.data as unknown as Record<string, unknown>
                                 console.log('📥 Raw alert received:', rawAlert)
 
                                 // Procesar alerta con severidad corregida
                                 const processedAlert: AlertData = {
-                                    id: rawAlert.id || Date.now(),
-                                    gpu_uuid: rawAlert.gpu_uuid || 'unknown',
-                                    rig_name: rawAlert.rig_name || 'Unknown',
-                                    message: rawAlert.message || 'Alert triggered',
-                                    triggered_at: rawAlert.triggered_at || message.timestamp,
-                                    alert_type: rawAlert.alert_type,
-                                    triggered_value: rawAlert.triggered_value,
-                                    threshold_value: rawAlert.threshold_value,
+                                    id: (rawAlert.id as number) || Date.now(),
+                                    gpu_uuid: (rawAlert.gpu_uuid as string) || 'unknown',
+                                    rig_name: (rawAlert.rig_name as string) || 'Unknown',
+                                    message: (rawAlert.message as string) || 'Alert triggered',
+                                    triggered_at: (rawAlert.triggered_at as string) || message.timestamp,
+                                    alert_type: rawAlert.alert_type as string,
+                                    triggered_value: rawAlert.triggered_value as number,
+                                    threshold_value: rawAlert.threshold_value as number,
                                     severity: rawAlert.alert_type 
-                                        ? mapAlertTypeToSeverity(rawAlert.alert_type)
-                                        : (rawAlert.severity || 'INFO'),
-                                    alerts: rawAlert.alerts || []
+                                        ? mapAlertTypeToSeverity(rawAlert.alert_type as string)
+                                        : ((rawAlert.severity as 'CRITICAL' | 'WARNING' | 'INFO') || 'INFO'),
+                                    alerts: (rawAlert.alerts as Array<{type: string; value: number; threshold: number}>) || []
                                 }
 
                                 console.log('🔄 Processed alert with corrected severity:', processedAlert)

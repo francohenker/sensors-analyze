@@ -263,17 +263,54 @@ app.get('/api/v1/recommendations/:gpu_uuid', async (req, res) => {
         `;
         
         const gpuResponse = await axios.get(`${RQLITE_URL}/db/query?q=${encodeURIComponent(gpuQuery)}`);
+        
+        // Verificar si hay datos
+        if (!gpuResponse.data.results || !gpuResponse.data.results[0] || !gpuResponse.data.results[0].values || gpuResponse.data.results[0].values.length === 0) {
+            return res.json({
+                gpu_uuid,
+                recommendations_count: 0,
+                recommendations: [],
+                message: 'No data available for this GPU'
+            });
+        }
+        
         const gpuData = gpuResponse.data.results[0].values[0];
         
+        // Debug: Log para ver qué datos tenemos
+        // Índices: g.* (0-8: id, gpu_uuid, rig_name, gpu_index, model, vendor, memory_size_mb, created_at, is_active)
+        // Luego: gpu_temp_celsius(9), hotspot_temp_celsius(10), memory_temp_celsius(11), power_draw_watt(12), fan_speed_percentage(13), age_days(14)
+        console.log('🔍 GPU Data for recommendations:', {
+            gpu_uuid,
+            data_length: gpuData.length,
+            model: gpuData[4],
+            rig: gpuData[2],
+            gpu_temp: gpuData[9],
+            hotspot_temp: gpuData[10],
+            memory_temp: gpuData[11],
+            power_draw: gpuData[12],
+            fan_speed: gpuData[13],
+            age_days: gpuData[14]
+        });
+        
+        // Verificar que tenemos datos de temperatura
+        if (!gpuData || gpuData.length < 15) {
+            return res.json({
+                gpu_uuid,
+                recommendations_count: 0,
+                recommendations: [],
+                message: 'Insufficient data for recommendations'
+            });
+        }
+        
         // 2. Regla: Temperatura alta sostenida
-        if (gpuData[7] > 80) { // gpu_temp_celsius
+        if (gpuData[9] && gpuData[9] > 80) { // gpu_temp_celsius (índice 9)
             recommendations.push({
                 type: 'performance_optimization',
                 action: 'reduce_core_clock',
-                severity: gpuData[7] > 85 ? 'critical' : 'high',
-                reason: `Temperatura GPU ${gpuData[7].toFixed(1)}°C supera umbral de 80°C`,
+                severity: gpuData[9] > 85 ? 'critical' : 'high',
+                reason: `Temperatura GPU ${gpuData[9].toFixed(1)}°C supera umbral de 80°C`,
                 details: {
-                    current_temp: gpuData[7],
+                    current_temp: gpuData[9],
                     threshold: 80,
                     suggested_reduction: '10-15%'
                 },
@@ -286,14 +323,14 @@ app.get('/api/v1/recommendations/:gpu_uuid', async (req, res) => {
         }
         
         // 3. Regla: Hotspot crítico
-        if (gpuData[8] > 95) { // hotspot_temp_celsius
+        if (gpuData[10] && gpuData[10] > 95) { // hotspot_temp_celsius (índice 10)
             recommendations.push({
                 type: 'thermal_management',
                 action: 'improve_cooling',
                 severity: 'critical',
-                reason: `Hotspot ${gpuData[8].toFixed(1)}°C indica problema de refrigeración`,
+                reason: `Hotspot ${gpuData[10].toFixed(1)}°C indica problema de refrigeración`,
                 details: {
-                    current_hotspot: gpuData[8],
+                    current_hotspot: gpuData[10],
                     threshold: 95
                 },
                 actions: [
@@ -305,22 +342,22 @@ app.get('/api/v1/recommendations/:gpu_uuid', async (req, res) => {
         }
         
         // 4. Regla: Ventilador al máximo
-        if (gpuData[11] > 90 && gpuData[7] > 75) { // fan_speed_percentage y temp
+        if (gpuData[13] && gpuData[9] && gpuData[13] > 90 && gpuData[9] > 75) { // fan_speed_percentage (índice 13) y temp
             recommendations.push({
                 type: 'maintenance',
                 action: 'clean_fans',
                 severity: 'medium',
                 reason: 'Ventiladores al máximo pero temperatura sigue alta',
                 details: {
-                    fan_speed: gpuData[11],
-                    gpu_temp: gpuData[7]
+                    fan_speed: gpuData[13],
+                    gpu_temp: gpuData[9]
                 }
             });
         }
         
         // 5. Regla: GPU antigua con degradación
-        const ageDays = gpuData[12]; // age_days
-        if (ageDays > 540) { // > 18 meses
+        const ageDays = gpuData[14] || 0; // age_days (índice 14)
+        if (ageDays && ageDays > 540) { // > 18 meses
             const thermalDegradation = await calculateThermalDegradation(gpu_uuid);
             
             if (thermalDegradation > 15) {
@@ -346,14 +383,14 @@ app.get('/api/v1/recommendations/:gpu_uuid', async (req, res) => {
         }
         
         // 6. Regla: Consumo alto vs rendimiento
-        if (gpuData[10] > 300) { // power_draw_watt
+        if (gpuData[12] && gpuData[12] > 300) { // power_draw_watt (índice 12)
             recommendations.push({
                 type: 'efficiency',
                 action: 'optimize_power_limit',
                 severity: 'medium',
                 reason: 'Alto consumo eléctrico - posible optimización',
                 details: {
-                    current_power: gpuData[10],
+                    current_power: gpuData[12],
                     suggested_power_limit: 250,
                     estimated_hashrate_loss: '5%',
                     monthly_savings: 25
@@ -364,8 +401,8 @@ app.get('/api/v1/recommendations/:gpu_uuid', async (req, res) => {
         res.json({
             gpu_uuid,
             gpu_info: {
-                model: gpuData[4],
-                rig: gpuData[2],
+                model: gpuData[4] || 'Unknown',
+                rig: gpuData[2] || 'Unknown',
                 age_days: ageDays
             },
             recommendations_count: recommendations.length,
@@ -376,7 +413,8 @@ app.get('/api/v1/recommendations/:gpu_uuid', async (req, res) => {
         });
     } catch (error) {
         console.error('❌ Error generating recommendations:', error.message);
-        res.status(500).json({ error: error.message });
+        console.error('Stack:', error.stack);
+        res.status(500).json({ error: error.message, stack: error.stack });
     }
 });
 
